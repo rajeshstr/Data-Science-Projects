@@ -1,0 +1,92 @@
+ANALYSIS OF STORM EVENTS AFFECTING HEALTH AND ECONOMIC WELL BEING IN USA
+========================================================================
+### Date: 5 Feb, 2021
+### Author: Rajesh T
+
+# SYNOPSIS
+Every year storm events cause irreparable damage in the United States of America affecting public health and economic well being. Damages to public health include fatalities and serious injuries whereas damages to economic well being mostly include property and crop damage. 
+
+The data for this analysis comes from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database which tracks characteristics of major storms and weather events in the USA.
+
+The analysis focuses on 2 questions:
+* Storm events that cause the maximum damage to Public Health
+* Storm events that cause the maximum damage to Economic well being
+
+# DATA PROCESSING
+* Data is downloaded using the read.csv() function (bzfile and sep = ',')
+* Only the relevant columns are taken (event type, health and economic damages)
+* The Crop and Property damages are converted to numbers and the dataframe is restructured
+* During the course of the analysis, the dataframe is again restructred using summarize, melt and aggregate functions
+
+```{r,echo=TRUE}
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+
+data <- read.csv('ReproRes/repdata_data_StormData.csv',header=T)
+stormData <- data[,c(8,23:28)]
+head(stormData)
+
+table(stormData$PROPDMGEXP)
+table(stormData$CROPDMGEXP)
+
+
+stormData <- stormData %>% mutate(CROPDMG = CROPDMG * case_when(
+  CROPDMGEXP == 'B' ~ 10^9,
+  CROPDMGEXP == 'K' | CROPDMGEXP == 'k' ~ 10^3,
+  CROPDMGEXP == 'M' | CROPDMGEXP == 'm' ~ 10^6,
+  CROPDMGEXP == 2 ~ 2,
+  TRUE ~ 0
+),CROPDMGEXP = NULL)
+
+stormData <- stormData %>% mutate(PROPDMG = PROPDMG * case_when(
+  PROPDMGEXP == 'B' ~ 10^9,
+  PROPDMGEXP == 'K' | PROPDMGEXP == 'k' ~ 10^3,
+  PROPDMGEXP == 'M' | PROPDMGEXP == 'm' ~ 10^6,
+  PROPDMGEXP == 'H' | PROPDMGEXP == 'h' ~ 10^2,
+  PROPDMGEXP == 1 ~ 1,
+  PROPDMGEXP == 2 ~ 2,
+  PROPDMGEXP == 3 ~ 3,
+  PROPDMGEXP == 4 ~ 4,
+  PROPDMGEXP == 5 ~ 5,
+  PROPDMGEXP == 6 ~ 6,
+  PROPDMGEXP == 7 ~ 7,
+  PROPDMGEXP == 8 ~ 8,
+  TRUE ~ 0
+),PROPDMGEXP = NULL)
+
+head(stormData)
+```
+
+# ANALYSIS OF STORM EVENTS - AFFECTING PUBLIC HEALTH & ECONOMIC WELL BEING
+### Top 10 Event Types affecting public health
+```{r,echo=TRUE}
+stormData_v1 <- stormData %>% group_by(EVTYPE) %>% summarize(damage = sum(FATALITIES,INJURIES))
+stormData_v1 <- as.data.frame(stormData_v1)
+stormData_v1 <- stormData_v1[order(-stormData_v1$damage),]
+
+barplot(stormData_v1[1:10,'damage'],names.arg=stormData_v1[1:10,'EVTYPE'],las=2,col="Violet", 
+        ylab="Damage", main="Top 10 EVTYPES affecting health",cex.names = 0.7)
+```
+
+### Top 10 Event Types affecting economic well being
+```{r,echo=TRUE}
+stormData_v2 <- melt(stormData,id = 'EVTYPE', variable.name = 'CATEGORY', 
+                   value.name = 'VALUE', na.rm = T)
+stormData_v2 <- aggregate(VALUE~EVTYPE + CATEGORY,stormData_v2[stormData_v2[,'CATEGORY'] %in% c('CROPDMG','PROPDMG'),],sum)
+stormData_v2 <- stormData_v2[order(-stormData_v2$VALUE),]
+
+ggplot(stormData_v2[1:20,], aes(EVTYPE, VALUE/10^9,colour=factor(CATEGORY))) + 
+  geom_bar(stat="identity") + 
+  facet_grid(CATEGORY ~ .) +
+  labs(title = "Top 20 EVTYPES with economic consequences", y = "Damage-$B") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# RESULTS
+* Question 1: Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+Answer: From the analysis we can infer that TORNADO as a storm event caused the maximum damage to public health in terms of fatalities and injuries
+
+* Question 2: Across the United States, which types of events have the greatest economic consequences?
+Answer: From the analysis we can infer that FLOOD & DROUGHT as storm events caused the maximum damage to economic well being in terms of Property and Crop damages respectively.
+Floods cause the most damage to property (144657709800), while droughts cause the most damage to crops (13972566000)
